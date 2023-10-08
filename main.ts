@@ -9,7 +9,7 @@ import {
 } from 'obsidian';
 import OpenAI from 'openai';
 import pMap from 'p-map';
-import * as pathParse from 'path-parse';
+import pathParse from 'path-parse';
 
 interface TitleGeneratorSettings {
   openAiApiKey: string;
