@@ -1,134 +1,194 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import * as path from 'path';
 
-// Remember to rename these classes and interfaces!
+import {
+  App,
+  Editor,
+  Modal,
+  Plugin,
+  PluginSettingTab,
+  Setting,
+  TFile,
+} from 'obsidian';
+import OpenAI from 'openai';
+import pMap from 'p-map';
 
-interface MyPluginSettings {
-	mySetting: string;
+interface TitleGeneratorSettings {
+  openAiApiKey: string;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+const DEFAULT_SETTINGS: TitleGeneratorSettings = {
+  openAiApiKey: '',
+};
+
+class TitleGeneratorSettingTab extends PluginSettingTab {
+  plugin: TitleGeneratorPlugin;
+
+  constructor(app: App, plugin: TitleGeneratorPlugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
+
+  display(): void {
+    const { containerEl } = this;
+    containerEl.empty();
+
+    new Setting(containerEl).setName('OpenAI API Key').addText((text) => {
+      text.inputEl.type = 'password';
+      text.inputEl.style.width = '100%';
+
+      text
+        .setPlaceholder('API Key')
+        .setValue(this.plugin.settings.openAiApiKey)
+        .onChange(async (newValue) => {
+          this.plugin.settings.openAiApiKey = newValue;
+          await this.plugin.saveSettings();
+        });
+    });
+  }
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+class TitleGeneratorErrorModal extends Modal {
+  private error: Error;
 
-	async onload() {
-		await this.loadSettings();
+  constructor(app: App, error: Error) {
+    super(app);
+    this.error = error;
+  }
 
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.setText(`Unable to generate title:\n\n${this.error.message}`);
+  }
 
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
-
-		// This adds a simple command that can be triggered anywhere
-		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-			}
-		});
-
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
-	}
-
-	onunload() {
-
-	}
-
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-	}
-
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
+  onClose() {
+    const { contentEl } = this;
+    contentEl.empty();
+  }
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
+export default class TitleGeneratorPlugin extends Plugin {
+  settings: TitleGeneratorSettings;
 
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
+  openai: OpenAI;
 
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
-}
+  private async generateTitle(file: TFile, content: string) {
+    const loadingStatus = this.addStatusBarItem();
+    loadingStatus.createEl('span', { text: 'Generating title...' });
 
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+    try {
+      const response = await this.openai.completions.create({
+        model: 'gpt-3.5-turbo-instruct',
+        prompt: `Given the following text:\n###\n${content}\n###\na succint, descriptive title would be: "`,
+        stop: '"',
+        logit_bias: {
+          9: -100,
+          59: -100,
+          14: -100,
+          27: -100,
+          29: -100,
+          25: -100,
+          91: -100,
+          30: -100,
+        },
+      });
+      const title = response.choices[0].text.trim();
 
-	constructor(app: App, plugin: MyPlugin) {
-		super(app, plugin);
-		this.plugin = plugin;
-	}
+      const currentPath = path.parse(file.path);
+      const newPath = `${currentPath.dir}/${title}${currentPath.ext}`;
 
-	display(): void {
-		const {containerEl} = this;
+      await this.app.fileManager.renameFile(file, newPath);
+    } catch (err) {
+      new TitleGeneratorErrorModal(this.app, err).open();
+    } finally {
+      loadingStatus.remove();
+    }
+  }
 
-		containerEl.empty();
+  private async generateTitleFromFile(file: TFile) {
+    const content = await file.vault.cachedRead(file);
+    return this.generateTitle(file, content);
+  }
 
-		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
-	}
+  private async generateTitleFromEditor(editor: Editor) {
+    const activeFile = this.app.workspace.getActiveFile();
+    if (!activeFile) {
+      throw new Error('No active file');
+    }
+
+    const content = editor.getValue();
+    this.generateTitle(activeFile, content);
+  }
+
+  async onload() {
+    await this.loadSettings();
+
+    this.openai = new OpenAI({
+      apiKey: this.settings.openAiApiKey,
+      dangerouslyAllowBrowser: true,
+    });
+
+    this.addCommand({
+      id: 'obsidian-title-generator-generate-title',
+      name: 'Generate title',
+      checkCallback: (checking) => {
+        const activeEditor = this.app.workspace.activeEditor?.editor;
+        if (!activeEditor) {
+          return false;
+        }
+
+        if (checking) {
+          return true;
+        }
+
+        this.generateTitleFromEditor(activeEditor);
+        return true;
+      },
+    });
+
+    this.registerEvent(
+      this.app.workspace.on('file-menu', (menu, file) => {
+        if (!(file instanceof TFile)) {
+          return;
+        }
+
+        menu.addItem((item) => {
+          item
+            .setTitle('Generate title')
+            .setIcon('lucide-edit-3')
+            .onClick(() => this.generateTitleFromFile(file));
+        });
+      })
+    );
+
+    this.registerEvent(
+      this.app.workspace.on('files-menu', (menu, files) => {
+        const tFiles = files.filter((f) => f instanceof TFile) as TFile[];
+        if (tFiles.length < 1) {
+          return;
+        }
+
+        menu.addItem((item) => {
+          item
+            .setTitle('Generate titles')
+            .setIcon('lucide-edit-3')
+            .onClick(() =>
+              pMap(tFiles, (f) => this.generateTitleFromFile(f), {
+                concurrency: 1,
+              })
+            );
+        });
+      })
+    );
+
+    this.addSettingTab(new TitleGeneratorSettingTab(this.app, this));
+  }
+
+  async loadSettings() {
+    this.settings = { ...DEFAULT_SETTINGS, ...(await this.loadData()) };
+  }
+
+  async saveSettings() {
+    await this.saveData(this.settings);
+    this.openai.apiKey = this.settings.openAiApiKey;
+  }
 }
