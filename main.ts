@@ -1,5 +1,3 @@
-import * as path from 'path';
-
 import {
   App,
   Editor,
@@ -11,6 +9,7 @@ import {
 } from 'obsidian';
 import OpenAI from 'openai';
 import pMap from 'p-map';
+import * as pathParse from 'path-parse';
 
 interface TitleGeneratorSettings {
   openAiApiKey: string;
@@ -93,7 +92,7 @@ export default class TitleGeneratorPlugin extends Plugin {
       });
       const title = response.choices[0].text.trim();
 
-      const currentPath = path.parse(file.path);
+      const currentPath = pathParse(file.path);
       const newPath = `${currentPath.dir}/${title}${currentPath.ext}`;
 
       await this.app.fileManager.renameFile(file, newPath);

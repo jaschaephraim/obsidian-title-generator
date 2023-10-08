@@ -29,6 +29,7 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^16.11.6",
+    "@types/path-parse": "^1.0.20",
     "@typescript-eslint/eslint-plugin": "5.29.0",
     "@typescript-eslint/parser": "5.29.0",
     "builtin-modules": "3.3.0",
@@ -45,6 +46,7 @@
   },
   "dependencies": {
     "openai": "^4.11.1",
-    "p-map": "^6.0.0"
+    "p-map": "^6.0.0",
+    "path-parse": "^1.0.7"
   }
 }
