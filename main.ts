@@ -128,7 +128,7 @@ export default class TitleGeneratorPlugin extends Plugin {
     });
 
     this.addCommand({
-      id: 'obsidian-title-generator-generate-title',
+      id: 'title-generator-generate-title',
       name: 'Generate title',
       checkCallback: (checking) => {
         const activeEditor = this.app.workspace.activeEditor?.editor;
