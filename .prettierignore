@@ -2,3 +2,4 @@ pnpm-lock.yaml
 data.json
 *.js
 *.mjs
+*.md

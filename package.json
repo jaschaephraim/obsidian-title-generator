@@ -1,8 +1,11 @@
 {
   "name": "obsidian-title-generator",
   "version": "1.0.0",
-  "description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+  "description": "Quickly and easily title your Obsidian notes using OpenAI's GPT-3.5",
   "main": "main.js",
+  "engines": {
+    "node": "18"
+  },
   "scripts": {
     "prepare": "husky install",
     "format": "prettier --check .",
@@ -12,8 +15,17 @@
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
     "version": "node version-bump.mjs && git add manifest.json versions.json"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "obsidian",
+    "plugin",
+    "openai",
+    "gpt"
+  ],
+  "author": {
+    "name": "Jascha Ephraim",
+    "email": "jaschaephraim@gmail.com",
+    "url": "https://jaschaephraim.com"
+  },
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^16.11.6",
