@@ -9,7 +9,7 @@ import {
 } from 'obsidian';
 import OpenAI from 'openai';
 import pMap from 'p-map';
-import pathParse from 'path-parse';
+import path from 'path-browserify';
 
 interface TitleGeneratorSettings {
   openAiApiKey: string;
@@ -92,7 +92,7 @@ export default class TitleGeneratorPlugin extends Plugin {
       });
       const title = response.choices[0].text.trim();
 
-      const currentPath = pathParse(file.path);
+      const currentPath = path.parse(file.path);
       const newPath = `${currentPath.dir}/${title}${currentPath.ext}`;
 
       await this.app.fileManager.renameFile(file, newPath);
@@ -171,7 +171,7 @@ export default class TitleGeneratorPlugin extends Plugin {
             .setTitle('Generate titles')
             .setIcon('lucide-edit-3')
             .onClick(() =>
-              pMap(tFiles, (f) => this.generateTitleFromFile(f), {
+              pMap<TFile, void>(tFiles, (f) => this.generateTitleFromFile(f), {
                 concurrency: 1,
               })
             );
