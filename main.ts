@@ -13,10 +13,12 @@ import path from 'path-browserify';
 
 interface TitleGeneratorSettings {
   openAiApiKey: string;
+  convertToLowerCase: boolean;
 }
 
 const DEFAULT_SETTINGS: TitleGeneratorSettings = {
   openAiApiKey: '',
+  convertToLowerCase: false,
 };
 
 class TitleGeneratorSettingTab extends PluginSettingTab {
@@ -43,6 +45,17 @@ class TitleGeneratorSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         });
     });
+
+    new Setting(containerEl)
+      .setName('All Lower Case Titles')
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.convertToLowerCase)
+          .onChange(async (newValue) => {
+            this.plugin.settings.convertToLowerCase = newValue;
+            await this.plugin.saveSettings();
+          });
+      });
   }
 }
 
@@ -90,7 +103,11 @@ export default class TitleGeneratorPlugin extends Plugin {
           30: -100,
         },
       });
-      const title = response.choices[0].text.trim();
+      let title = response.choices[0].text.trim();
+
+      if (this.settings.convertToLowerCase) {
+        title = title.toLowerCase();
+      }
 
       const currentPath = path.parse(file.path);
       const newPath = `${currentPath.dir}/${title}${currentPath.ext}`;

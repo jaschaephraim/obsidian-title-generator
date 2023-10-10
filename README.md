@@ -2,7 +2,7 @@
 
 Quickly and easily title your [Obsidian](https://obsidian.md) notes using [OpenAI's](https://openai.com/) GPT-3.5
 
-Generate titles for one or multiple notes at a time.
+Generate titles for one or multiple notes at a time based on their content.
 
 Generating a title will set the note's title directly. Run multiple times for variations.
 
@@ -31,3 +31,5 @@ With multiple files selected, right click on a file name and there will be an en
 ## Settings
 
 You will need to create an [OpenAI API key](https://openai.com/product) and add it to this plugin's settings.
+
+There is also a setting to make titles all lower-case.
