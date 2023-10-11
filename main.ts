@@ -1,11 +1,12 @@
 import {
   App,
   Editor,
-  Modal,
+  Notice,
   Plugin,
   PluginSettingTab,
   Setting,
   TFile,
+  normalizePath,
 } from 'obsidian';
 import OpenAI from 'openai';
 import pMap from 'p-map';
@@ -13,12 +14,12 @@ import path from 'path-browserify';
 
 interface TitleGeneratorSettings {
   openAiApiKey: string;
-  convertToLowerCase: boolean;
+  lowerCaseTitles: boolean;
 }
 
 const DEFAULT_SETTINGS: TitleGeneratorSettings = {
   openAiApiKey: '',
-  convertToLowerCase: false,
+  lowerCaseTitles: false,
 };
 
 class TitleGeneratorSettingTab extends PluginSettingTab {
@@ -33,7 +34,7 @@ class TitleGeneratorSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    new Setting(containerEl).setName('OpenAI API Key').addText((text) => {
+    new Setting(containerEl).setName('OpenAI API key').addText((text) => {
       text.inputEl.type = 'password';
       text.inputEl.style.width = '100%';
 
@@ -47,34 +48,15 @@ class TitleGeneratorSettingTab extends PluginSettingTab {
     });
 
     new Setting(containerEl)
-      .setName('All Lower Case Titles')
+      .setName('Lower-case titles')
       .addToggle((toggle) => {
         toggle
-          .setValue(this.plugin.settings.convertToLowerCase)
+          .setValue(this.plugin.settings.lowerCaseTitles)
           .onChange(async (newValue) => {
-            this.plugin.settings.convertToLowerCase = newValue;
+            this.plugin.settings.lowerCaseTitles = newValue;
             await this.plugin.saveSettings();
           });
       });
-  }
-}
-
-class TitleGeneratorErrorModal extends Modal {
-  private error: Error;
-
-  constructor(app: App, error: Error) {
-    super(app);
-    this.error = error;
-  }
-
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.setText(`Unable to generate title:\n\n${this.error.message}`);
-  }
-
-  onClose() {
-    const { contentEl } = this;
-    contentEl.empty();
   }
 }
 
@@ -105,16 +87,18 @@ export default class TitleGeneratorPlugin extends Plugin {
       });
       let title = response.choices[0].text.trim();
 
-      if (this.settings.convertToLowerCase) {
+      if (this.settings.lowerCaseTitles) {
         title = title.toLowerCase();
       }
 
       const currentPath = path.parse(file.path);
-      const newPath = `${currentPath.dir}/${title}${currentPath.ext}`;
+      const newPath = normalizePath(
+        `${currentPath.dir}/${title}${currentPath.ext}`
+      );
 
       await this.app.fileManager.renameFile(file, newPath);
     } catch (err) {
-      new TitleGeneratorErrorModal(this.app, err).open();
+      new Notice(`Unable to generate title:\n\n${err}`);
     } finally {
       loadingStatus.remove();
     }
@@ -146,19 +130,7 @@ export default class TitleGeneratorPlugin extends Plugin {
     this.addCommand({
       id: 'title-generator-generate-title',
       name: 'Generate title',
-      checkCallback: (checking) => {
-        const activeEditor = this.app.workspace.activeEditor?.editor;
-        if (!activeEditor) {
-          return false;
-        }
-
-        if (checking) {
-          return true;
-        }
-
-        this.generateTitleFromEditor(activeEditor);
-        return true;
-      },
+      editorCallback: (editor) => this.generateTitleFromEditor(editor),
     });
 
     this.registerEvent(
