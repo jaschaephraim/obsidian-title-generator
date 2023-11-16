@@ -71,13 +71,14 @@ export default class TitleGeneratorPlugin extends Plugin {
 
     try {
       let prevTitle = file.basename.toLowerCase();
-	  let title = prevTitle;
-	  
-	  for (let i = 0; (i < 3 && title.toLowerCase() == prevTitle); i++) {
+      let title = prevTitle;
+      
+      for (let i = 0; (i < 3 && title.toLowerCase() == prevTitle); i++) {
         const response = await this.openai.completions.create({
           model: 'gpt-3.5-turbo-instruct',
           prompt: `Given the following text:\n###\n${content}\n###\nits main idea are succintly summarized (without using any question marks, colons, slashes or asterisks) by this one simple clause (in the same language spoken by the text's author): "`,
           stop: '"',
+          max_tokens: 48,
           logit_bias: {
             9: -100,
             59: -100,
@@ -88,18 +89,17 @@ export default class TitleGeneratorPlugin extends Plugin {
             91: -100,
             30: -100
           },
-	   	max_tokens: 48,
         });
 	     
         let title = response.choices[0].text.replace(/[^a-zA-Z0-9]*$/, '').replace(/[<>?:*\/\\]/g, '');
-	  }
+      }
 	  
       if (this.settings.lowerCaseTitles) {
         title = title.toLowerCase();
       }
-	  
-      const currentPath = import_path_browserify.default.parse(file.path);
-      const newPath = (0, import_obsidian.normalizePath)(
+      
+      const currentPath = path.parse(file.path);
+      const newPath = normalizePath(
         `${currentPath.dir}/${title}${currentPath.ext}`
       );
 
