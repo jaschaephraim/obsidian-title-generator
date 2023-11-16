@@ -70,29 +70,36 @@ export default class TitleGeneratorPlugin extends Plugin {
     loadingStatus.createEl('span', { text: 'Generating title...' });
 
     try {
-      const response = await this.openai.completions.create({
-        model: 'gpt-3.5-turbo-instruct',
-        prompt: `Given the following text and the language it's written in:\n###\n${content}\n###\na succint, descriptive title for it, in that language, would be: "`,
-        stop: '"',
-        logit_bias: {
-          9: -100,
-          59: -100,
-          14: -100,
-          27: -100,
-          29: -100,
-          25: -100,
-          91: -100,
-          30: -100,
-        },
-      });
-      let title = response.choices[0].text.trim();
-
+      let prevTitle = file.basename.toLowerCase();
+	  let title = prevTitle;
+	  
+	  for (let i = 0; (i < 3 && title.toLowerCase() == prevTitle); i++) {
+        const response = await this.openai.completions.create({
+          model: 'gpt-3.5-turbo-instruct',
+          prompt: `Given the following text:\n###\n${content}\n###\nits main idea are succintly summarized (without using any question marks, colons, slashes or asterisks) by this one simple clause (in the same language spoken by the text's author): "`,
+          stop: '"',
+          logit_bias: {
+            9: -100,
+            59: -100,
+            14: -100,
+            27: -100,
+            29: -100,
+            25: -100,
+            91: -100,
+            30: -100
+          },
+	   	max_tokens: 48,
+        });
+	     
+        let title = response.choices[0].text.replace(/[^a-zA-Z0-9]*$/, '').replace(/[<>?:*\/\\]/g, '');
+	  }
+	  
       if (this.settings.lowerCaseTitles) {
         title = title.toLowerCase();
       }
-
-      const currentPath = path.parse(file.path);
-      const newPath = normalizePath(
+	  
+      const currentPath = import_path_browserify.default.parse(file.path);
+      const newPath = (0, import_obsidian.normalizePath)(
         `${currentPath.dir}/${title}${currentPath.ext}`
       );
 
