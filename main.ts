@@ -72,7 +72,7 @@ export default class TitleGeneratorPlugin extends Plugin {
     try {
       const response = await this.openai.completions.create({
         model: 'gpt-3.5-turbo-instruct',
-        prompt: `Given the following text:\n###\n${content}\n###\na succint, descriptive title would be: "`,
+        prompt: `Given the following text and the language it's written in:\n###\n${content}\n###\na succint, descriptive title for it, in that language, would be: "`,
         stop: '"',
         logit_bias: {
           9: -100,
