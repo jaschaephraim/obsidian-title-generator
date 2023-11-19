@@ -20,6 +20,7 @@ interface TitleGeneratorSettings {
 const DEFAULT_SETTINGS: TitleGeneratorSettings = {
   openAiApiKey: '',
   lowerCaseTitles: false,
+  acceptSubtitles: false,
 };
 
 class TitleGeneratorSettingTab extends PluginSettingTab {
@@ -34,18 +35,19 @@ class TitleGeneratorSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    new Setting(containerEl).setName('OpenAI API key').addText((text) => {
-      text.inputEl.type = 'password';
-      text.inputEl.style.width = '100%';
-
-      text
-        .setPlaceholder('API Key')
-        .setValue(this.plugin.settings.openAiApiKey)
-        .onChange(async (newValue) => {
-          this.plugin.settings.openAiApiKey = newValue;
-          await this.plugin.saveSettings();
-        });
-    });
+    new Setting(containerEl)
+      .setName('OpenAI API key')
+      .addText((text) => {
+        text.inputEl.type = 'password';
+        text.inputEl.style.width = '100%';
+        text
+          .setPlaceholder('API Key')
+          .setValue(this.plugin.settings.openAiApiKey)
+          .onChange(async (newValue) => {
+            this.plugin.settings.openAiApiKey = newValue;
+            await this.plugin.saveSettings();
+          });
+      });
 
     new Setting(containerEl)
       .setName('Lower-case titles')
@@ -54,6 +56,17 @@ class TitleGeneratorSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.lowerCaseTitles)
           .onChange(async (newValue) => {
             this.plugin.settings.lowerCaseTitles = newValue;
+            await this.plugin.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName('Accept sub-titles')
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.acceptSubtitles)
+          .onChange(async (newValue) => {
+            this.plugin.settings.acceptSubtitles = newValue;
             await this.plugin.saveSettings();
           });
       });
@@ -74,24 +87,23 @@ export default class TitleGeneratorPlugin extends Plugin {
       let title = prevTitle;
       
       for (let i = 0; (i < 3 && title.toLowerCase() == prevTitle); i++) {
-        const response = await this.openai.completions.create({
-          model: 'gpt-3.5-turbo-instruct',
-          prompt: `Given the following text:\n###\n${content}\n###\nits main idea are succintly summarized (without using any question marks, colons, slashes or asterisks) by this one simple clause (in the same language spoken by the text's author): "`,
-          stop: '"',
-          max_tokens: 48,
-          logit_bias: {
-            9: -100,
-            59: -100,
-            14: -100,
-            27: -100,
-            29: -100,
-            25: -100,
-            91: -100,
-            30: -100
-          },
+        let response = await this.openai.chat.completions.create({
+          model: "gpt-3.5-turbo-1106",
+          messages: [{role: "system", content: "You are a function for giving titles to texts. You receive a text and output a succint and descriptive title for that text. Your reply consists in this title, and nothing else. Your reply does not contain question marks. Your reply does not contain slashes or backslashes. You always reply in the user's language."},
+                     {role: "user", content: content}],
+          max_tokens: 48
         });
-	     
-        let title = response.choices[0].text.replace(/[^a-zA-Z0-9]*$/, '').replace(/[<>?:*\/\\]/g, '');
+		  
+        title = response.choices[0].message.content;
+        title = title.replace(/(\.$|["<>\?\*\/\\])/g, '');
+	      
+        if (this.settings.acceptSubtitles) {
+          title = title.replace(/:/g, " - ");
+        } else {
+          title = title.replace(/:.*/g, "");
+        }
+	      
+        title = title.replace(/  +/g, " ").trim();
       }
 	  
       if (this.settings.lowerCaseTitles) {
